@@ -41,6 +41,24 @@
 
                   [:role/name
                    :db.type/string
+                   :db.cardinality/one]
+
+                  [:order/price
+                   :db.type/bigdec
+                   :db.cardinality/one]
+                  [:order/name
+                   :db.type/string
+                   :db.cardinality/one]
+                  [:order/roles
+                   :db.type/ref
+                   :db.cardinality/many]
+                  
+                  [:data/src
+                   :db.type/string
+                   :db.cardinality/many]
+
+                  [:entity/type
+                   :db.type/keyword
                    :db.cardinality/one]])
 
 (defn main []

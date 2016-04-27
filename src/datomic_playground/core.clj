@@ -2,7 +2,7 @@
   (:gen-class)
   (use ring.middleware.reload)
   (use ring.adapter.jetty)
-  (:require [datomic.api :refer [q db pull] :as d]
+  (:require [datomic.api :refer [q db pull tempid] :as d]
             [clojure.pprint :as pp]
             [datomic-playground.schema :refer [main]]
             [compojure.core :refer :all]
@@ -16,24 +16,52 @@
   (d/create-database uri)
   (d/connect uri))
 
+
+(defn getUserRoles [userId]
+  (let [conn (makeConn)
+        my-db (db conn)]
+    (q '[:find (pull ?user [{:user/role [:db/id :role/name]}]) .
+         :in $ ?user
+         :where [?user]]
+       my-db
+       userId)))
+
+(defn createOrder [order userId]
+  (let [conn (makeConn)
+        roles (getUserRoles userId)]
+    (d/transact conn [(merge order {:db/id (tempid :db.part/user)})])))
+
+(createOrder {:order/price 100M :order/name "Lui Ghita"} 17592186045470)
+
+(defn getOrders []
+  (let [conn (makeConn)
+        my-db (db conn)]
+    (q '[:find (pull ?order [:order/name :order/price])
+         :in $
+         :where [?order :order/name _]]
+       my-db)))
+
+(getOrders)
+
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
-  (def uri "datomic:dev://localhost:4334/hello")
-  (d/create-database uri)
-  
-  (def conn (d/connect uri))
+  (def conn (makeConn))
 
   (def datom-user-schema (main))
   
   (d/transact conn datom-user-schema)
 
-  (def user [{:db/id #db/id[:db.part/user]
-              :user/email "ghita3@google.com"
-              :user/role [{:db/id 17592186045462}]}])
+  (def user [[:db/add #db/id[:db.part/tx] :data/src "www"]
+             {:db/id #db/id[:db.part/user]
+                 :user/email "ghita5@google.com"}])
   (d/transact conn user)
-  
-  
+
+  (def updatedUser [[:db/add #db/id[:db.part/tx] :data/src "www"]
+                    [:db/add 17592186045470
+                     :user/email "hello@hello.com"]])
+  (d/transact conn updatedUser)
+    
   (def role [[:db/add 17592186045470
               :user/role 17592186045464]])
 
@@ -41,11 +69,10 @@
   
   (def my-db (db conn))
 
-  (->> (q '[:find ?name ?role
+  (->> (q '[:find ?user
          :in $
          :where
-            [?role :role/name ?name]
-            [?user :user/role ?role]]
+            [?user :user/email _ ?tx]]
        my-db)
        seq
        println))
@@ -62,6 +89,4 @@
 
 (def handler
   (routes
-   (GET "/foo/:id{[0-9]+}" [id] (str "Hello, I'm " id))
-   (GET "/bar" [] "Hello Bar")
-   (GET "/hei/:helooooooooo" request (str request))))
+   (GET "/api" request (str request))))
